@@ -186,7 +186,7 @@ class TDApi():
         url, merged_headers = self._auth.headers(endpoint)
 
         # return teh resposnse of the get request.
-        return requests.get(url=url, headers=merged_headers, verify = True, timeout = 5).json()
+        return requests.get(url=url, headers=merged_headers, verify = True, timeout = 10).json()
 
     def get_streamer_subscription_keys(self, account = None):
 
@@ -220,7 +220,7 @@ class TDApi():
 
         #return the response of the get request
         return requests.get(url = url, headers=merged_headers, params = data,
-                            verify = True, timeout = 5).json()
+                            verify = True, timeout = 10).json()
 
     def get_user_principals(self, fields = None):
 
@@ -261,7 +261,7 @@ class TDApi():
 
         #return the response of the get request.
         return requests.get(url = url, headers=merged_headers, params = data,
-                            verify = True, timeout = 5).json()
+                            verify = True, timeout = 10).json()
 
     def update_preferences(self, account = None, data_payload = None):
 
@@ -335,7 +335,7 @@ class TDApi():
 
         # make the request
         response = requests.put(url=url, headers = merged_headers, data = json.dumps(data_payload),
-                                verify = True, timeout = 5)
+                                verify = True, timeout = 10)
 
         if response.status_code == 204:
             print("Preferences successfully updated.\n")
@@ -391,7 +391,7 @@ class TDApi():
 
         #return the response of the get request.
         return requests.get(url = url, headers = merged_headers, params = data,
-                            verify = True, timeout = 5).json()
+                            verify = True, timeout = 10).json()
 
 
 
@@ -568,7 +568,7 @@ class TDApi():
 
         #make the request
         response = requests.post(url = url, headers = merged_headers, data = json.dumps(payload),
-                                 verify = True, timeout = 5)
+                                 verify = True, timeout = 10)
 
         if response.status_code == 201:
             print(f"Watchlist {name} was successfully created.\n")
@@ -605,7 +605,7 @@ class TDApi():
         url, merged_headers = self._auth.headers(endpoint)
 
         #Make the request
-        return requests.get(url = url, headers = merged_headers, verify = True, timeout = 5).json()
+        return requests.get(url = url, headers = merged_headers, verify = True, timeout = 10).json()
 
     def get_watchlist(self, account = None, watchlist_id = None):
 
@@ -636,7 +636,7 @@ class TDApi():
         url, merged_headers = self._auth.headers(endpoint)
 
         #make a request
-        return requests.get(url = url, headers = merged_headers, verify = True, timeout = 5).json()
+        return requests.get(url = url, headers = merged_headers, verify = True, timeout = 10).json()
 
     def delete_watchlist(self, account = None, watchlist_id = None):
 
@@ -667,7 +667,7 @@ class TDApi():
         url, merged_headers = self._auth.headers(endpoint)
 
         #make teh request
-        response = requests.delete(url = url, headers = merged_headers, verify = True, timeout = 5)
+        response = requests.delete(url = url, headers = merged_headers, verify = True, timeout = 10)
 
         if response.status_code == 204:
             return print(f"Watchlist {watchlist_id} was successfully deleted.\n")
@@ -719,7 +719,7 @@ class TDApi():
 
         #make a request
         response = requests.patch(url = url, headers = merged_headers, data = json.dumps(payload),
-                                  verify = True, timeout = 5)
+                                  verify = True, timeout = 10)
 
         if response.status_code == 204:
             return print(f"Watchlist {watchlist_id} was successfully updated.\n")
@@ -772,7 +772,7 @@ class TDApi():
 
         #make the request
         response = requests.put(url = url, headers = merged_headers, data = json.dumps(payload),
-                                verify = True, timeout = 5)
+                                verify = True, timeout = 10)
         if response.status_code == 204:
             return print(f"Watchlist {watchlist_id} was successfully repleaced.\n")
 
@@ -852,7 +852,7 @@ class TDApi():
 
         #make the request
         return requests.get(url=url, headers = merged_headers, params = data,
-                            verify = True, timeout = 5).json()
+                            verify = True, timeout = 10).json()
 
 
     def get_orders_query(self, account = None, max_results = None, from_entered_time = None,
@@ -926,7 +926,7 @@ class TDApi():
 
         #make the request
         return requests.get(url=url, headers = merged_headers, params = data,
-                            verify = True, timeout = 5).json()
+                            verify = True, timeout = 10).json()
 
 
     def get_order(self, account = None, order_id = None):
@@ -956,7 +956,7 @@ class TDApi():
         url, merged_headers =self._auth.headers(endpoint)
 
         #make the request
-        return requests.get(url=url, headers = merged_headers, verify = True, timeout = 5).json()
+        return requests.get(url=url, headers = merged_headers, verify = True, timeout = 10).json()
 
     def cancel_order(self, account = None, order_id = None):
 
@@ -987,7 +987,7 @@ class TDApi():
         url, merged_headers =self._auth.headers(endpoint)
 
         #make the request
-        response = requests.delete(url=url, headers = merged_headers, verify = True, timeout = 5)
+        response = requests.delete(url=url, headers = merged_headers, verify = True, timeout = 10)
 
         if response.status_code == 200:
             return print(f"Order {order_id} was successfully CANCELED.\n")
@@ -1092,7 +1092,7 @@ class TDApi():
 
         #make the request
         response = requests.post(url = url, headers = merged_headers, data = json.dumps(payload),
-                                 verify = True, timeout = 5)
+                                 verify = True, timeout = 10)
 
         if response.status_code == 201:
             return print(f"New {symbol} order was successfully created.\n")
@@ -1202,7 +1202,7 @@ class TDApi():
 
         #make the request
         response = requests.put(url = url, headers = merged_headers, data = json.dumps(payload),
-                                verify = True, timeout = 5)
+                                verify = True, timeout = 10)
 
         if response.status_code == 201:
             return print(f"Order {order_id} was successfully replaced.\n")
@@ -1287,7 +1287,7 @@ class TDApi():
 
         #make the request
         return requests.get(url=url, headers = merged_headers, params = data,
-                            verify = True, timeout = 5).json()
+                            verify = True, timeout = 10).json()
 
     def get_savedorder(self, account = None, savedorder_id = None):
 
@@ -1319,7 +1319,7 @@ class TDApi():
         url, merged_headers =self._auth.headers(endpoint)
 
         #make the request
-        return requests.get(url=url, headers = merged_headers, verify = True, timeout = 5).json()
+        return requests.get(url=url, headers = merged_headers, verify = True, timeout = 10).json()
 
     def cancel_savedorder(self, account = None, savedorder_id = None):
 
@@ -1351,7 +1351,7 @@ class TDApi():
         url, merged_headers =self._auth.headers(endpoint)
 
         #make the request
-        response = requests.delete(url=url, headers = merged_headers, verify = True, timeout = 5)
+        response = requests.delete(url=url, headers = merged_headers, verify = True, timeout = 10)
 
         if response.status_code == 200:
             return print(f"SavedOrder {savedorder_id} was successfully CANCELED.\n")
@@ -1447,7 +1447,7 @@ class TDApi():
 
         #make the request
         response = requests.post(url = url, headers = merged_headers, data = json.dumps(payload),
-                                 verify = True, timeout = 5)
+                                 verify = True, timeout = 10)
 
         if response.status_code == 201:
             return print(f"SavedOrder {symbol} was successfully created.\n")
@@ -1548,7 +1548,7 @@ class TDApi():
 
         #make the request
         response = requests.put(url = url, headers = merged_headers, data = json.dumps(payload),
-                                verify = True, timeout = 5)
+                                verify = True, timeout = 10)
 
         if response.status_code == 201:
             return print(f"SavedOrder {savedorder_id} was successfully replaced.\n")
@@ -1589,7 +1589,7 @@ class TDApi():
 
         #make the request
         response = requests.post(url = url, headers = merged_headers, data = json.dumps(order),
-                                 verify = True, timeout = 5)
+                                 verify = True, timeout = 10)
 
         if response.status_code == 201:
             return print("New costumed order was successfully created.\n")
@@ -1631,7 +1631,7 @@ class TDApi():
 
         #make the request
         response = requests.put(url = url, headers = merged_headers, data = json.dumps(order),
-                                verify = True, timeout = 5)
+                                verify = True, timeout = 10)
 
         if response.status_code == 201:
             return print(f"Order {order_id} was successfully replaced.\n")
@@ -1668,7 +1668,7 @@ class TDApi():
 
         #make the request
         response = requests.post(url = url, headers = merged_headers, data = json.dumps(savedorder),
-                                 verify = True, timeout = 5)
+                                 verify = True, timeout = 10)
 
         if response.status_code == 201:
             return print("New costumed savedorder was successfully created.\n")
@@ -1710,7 +1710,7 @@ class TDApi():
 
         #make the request
         response = requests.put(url = url, headers = merged_headers, data = json.dumps(order),
-                                verify = True, timeout = 5)
+                                verify = True, timeout = 10)
 
         if response.status_code == 201:
             return print(f"Savedorder {savedorder_id} was successfully replaced.\n")
@@ -1779,7 +1779,7 @@ class TDApi():
 
         # return the response of the get request.
         return requests.get(url=url, headers=merged_headers, params=data,
-                            verify = True, timeout = 5).json()
+                            verify = True, timeout = 10).json()
 
 
     def get_instruments(self, cusip = None):
@@ -1806,7 +1806,7 @@ class TDApi():
         url = url + "/" + cusip
 
         # return the resposne of the get request.
-        return requests.get(url = url, headers=merged_headers, verify = True, timeout = 5).json()
+        return requests.get(url = url, headers=merged_headers, verify = True, timeout = 10).json()
 
 
     ####  MARKET HOURS
@@ -1843,7 +1843,7 @@ class TDApi():
 
         # return the response of the get request.
         return requests.get(url = url, headers = merged_headers,params = data,
-                            verify = True, timeout = 5).json()
+                            verify = True, timeout = 10).json()
 
 
     def get_market_hours(self, market = None, date = datetime.now()):
@@ -1875,7 +1875,7 @@ class TDApi():
 
         # return the response of the get request.
         return requests.get(url = url, headers = merged_headers,params = data,
-                            verify = True, timeout = 5).json()
+                            verify = True, timeout = 10).json()
 
 
     #### MOVERS
@@ -1921,7 +1921,7 @@ class TDApi():
 
         #return the response of the request.
         return requests.get(url=url, headers=merged_headers, params=data,
-                            verify = True, timeout = 5).json()
+                            verify = True, timeout = 10).json()
 
 
     #### QUOTES
@@ -1957,7 +1957,7 @@ class TDApi():
 
         #return the response of the get request.
         return requests.get(url = url, headers=merged_headers, params=data,
-                            verify = True, timeout = 5).json()
+                            verify = True, timeout = 10).json()
 
     def get_quote(self, instruments = None):
 
@@ -1982,7 +1982,7 @@ class TDApi():
         url, merged_headers = self._auth.headers(endpoint)
 
         #return the response of the get request.
-        return requests.get(url = url, headers=merged_headers, verify = True, timeout = 5).json()
+        return requests.get(url = url, headers=merged_headers, verify = True, timeout = 10).json()
 
 
 
@@ -2059,7 +2059,7 @@ class TDApi():
 
         #make the request
         return requests.get(url = url, headers = merged_headers,params = data,
-                            verify = True, timeout = 5).json()
+                            verify = True, timeout = 10).json()
 
 
     def pricehistory_dates(self, symbol = None, period_type = None, frequency_type = None,
@@ -2131,7 +2131,7 @@ class TDApi():
 
         #make the request
         return requests.get(url = url, headers = merged_headers,params = data,
-                            verify = True, timeout = 5).json()
+                            verify = True, timeout = 10).json()
 
 
     #### OPTION CHAIN
@@ -2191,4 +2191,4 @@ class TDApi():
 
         #return the response of the get request.
         return requests.get(url = url, headers = merged_headers,params = data,
-                            verify = True, timeout = 5).json()
+                            verify = True, timeout = 10).json()

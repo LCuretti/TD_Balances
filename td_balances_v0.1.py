@@ -167,6 +167,23 @@ class Position:
         self.lifo['allocated'] = round(self.lifo['allocated'],2)
 
 
+    def split_holding(self, transaction):
+        #find split ratio
+        original_quantity = self.quantity
+        extra_quantity = transaction['transactionItem']['amount']
+        new_quantity = original_quantity + extra_quantity
+        
+        split_ratio = new_quantity / original_quantity
+        
+        self.quantity = new_quantity
+        for method in ('fifo', 'lifo'):
+            holdings = getattr(self, method)['holdings']
+            
+            for holding in holdings:
+                holding['quantity'] = holding['quantity'] * split_ratio
+                holding['price_with_fees'] / split_ratio
+    
+
     def _add_holding(self, quantity, price_with_fees, date_time):
         '''
         Adds a new holding to the list of positions.
@@ -336,21 +353,33 @@ class Balances:
         Returns:
             None
         '''
+        
 
         if transaction['position affected']:
 
-            if self.incorrect_sequence_list: #There is a ongoing sequence fix
+            if transaction['instruction'] == 'SPLIT':
+                symbol = transaction['transactionItem']['instrument']['symbol']
+                self.positions[symbol].split_holding(transaction)
+                results = {'reverse': False,
+                            'fifo':{'gain' : 0.00, 'duration': timedelta()},
+                            'lifo':{'gain' : 0.00, 'duration': timedelta()}
+                          }
+                self._update_transaction_data(transaction, results)
+                
+            elif self.incorrect_sequence_list: #There is a ongoing sequence fix
+
                 if self.incorrect_sequence_list[0]['transactionDate'] == transaction['transactionDate']:
                 #As the ongoing transaction has the same time as the one detected as wrong sequence
                 #We add to teh queue to reoder in apropiate sequence whenever we have all of them
+                    transaction['transactionItem']['positionEffect'] = 'sorted'
                     self.incorrect_sequence_list.append(transaction)
 
-                elif self._transaction_wrong_sequence_detected(transaction):
-                    self._process_incorrect_sequence()
-                    self.incorrect_sequence_list.append(transaction)
                 else:
                     self._process_incorrect_sequence()
-                    self._update_position_balances(transaction)
+                    if self._transaction_wrong_sequence_detected(transaction):
+                        self.incorrect_sequence_list.append(transaction)
+                    else:   
+                        self._update_position_balances(transaction)
 
             elif self._transaction_wrong_sequence_detected(transaction):
                 self.incorrect_sequence_list.append(transaction)
@@ -364,6 +393,18 @@ class Balances:
                         'lifo':{'gain' : 0.00, 'duration': timedelta()}
                       }
             self._update_transaction_data(transaction, results)
+
+
+    def is_less_than_3_min_diff(self, d1, d2):
+        date1 = datetime.strptime(d1, "%Y-%m-%dT%H:%M:%S%z")
+        date2 = datetime.strptime(d2, "%Y-%m-%dT%H:%M:%S%z")
+        
+        # Calcular la diferencia en minutos
+        difference_in_minutes = abs((date2 - date1).total_seconds() / 60)
+        
+        if difference_in_minutes < 3:
+            return True
+        return False
 
 
     def _process_incorrect_sequence(self):
@@ -403,22 +444,18 @@ class Balances:
 
             if not transaction['opening transaction']:
                 wrong_sequence = True
-                print('\nWARNING - transaction came in the wrong sequence', transaction)
-                if 'positionEffect' in transaction_item:
-                    transaction_item['positionEffect'] += ' - Warning, Transaction Sub type MISMATCH'
-                else:
-                    transaction_item['positionEffect'] = 'Warning, Transaction Sub type MISMATCH'
                 #logger.warning('Transaction Sub type mismatch: %s',transaction)
         else:
-
             if transaction['opening transaction']:
                 wrong_sequence = True
                 #logger.warning('Transaction Sub type mismatch: %s',transaction)
-                print('\nWARNING - transaction came in the wrong sequence', transaction)
-                if 'positionEffect' in transaction_item:
-                    transaction_item['positionEffect'] += ' - Warning, Transaction Sub type MISMATCH'
-                else:
-                    transaction_item['positionEffect'] = 'Warning, Transaction Sub type MISMATCH'
+               
+        if wrong_sequence:
+            print('\nWARNING - transaction came in the wrong sequence', transaction)
+            if 'positionEffect' in transaction_item:
+                transaction_item['positionEffect'] += ' - Warning, Transaction Sub type MISMATCH'
+            else:
+                transaction_item['positionEffect'] = 'Warning, Transaction Sub type MISMATCH'
 
         return wrong_sequence
 
@@ -435,7 +472,7 @@ class Balances:
         '''
 
         symbol = transaction['transactionItem']['instrument']['symbol']
-
+        
         if symbol not in self.positions:
             self.positions[symbol] = Position(symbol)
 
@@ -628,7 +665,8 @@ class Balances:
         relevant_transaction_types = ('TRADE', 'RECEIVE_AND_DELIVER')
         irrelevant_transaction_descriptions = ('CASH ALTERNATIVES PURCHASE',
                                    'CASH ALTERNATIVES REDEMPTION',
-                                   'CASH ALTERNATIVES INTEREST')
+                                   'CASH ALTERNATIVES INTEREST',
+                                   'INTERNAL TRANSFER BETWEEN ACCOUNTS OR ACCOUNT TYPES')
 
 
         transaction['position affected'] = (transaction['type'] in relevant_transaction_types and
@@ -639,7 +677,8 @@ class Balances:
         transaction_instructions = {
             'TRANSFER OF SECURITY OR OPTION IN': 'BUY',
             'NON-TAXABLE SPIN OFF/LIQUIDATION DISTRIBUTION': 'BUY',
-            'REMOVAL OF OPTION DUE TO EXPIRATION': 'SELL'
+            'REMOVAL OF OPTION DUE TO EXPIRATION': 'SELL',
+            'STOCK SPLIT': 'SPLIT'
         }
 
         instruction = transaction['transactionItem'].get('instruction',
@@ -651,11 +690,15 @@ class Balances:
         description = transaction['description']
         opening_transaction_descriptions = ('BUY TRADE', 'SHORT SALE',
                                             'TRANSFER OF SECURITY OR OPTION IN',
-                                'NON-TAXABLE SPIN OFF/LIQUIDATION DISTRIBUTION')
+                                'NON-TAXABLE SPIN OFF/LIQUIDATION DISTRIBUTION'
+                                )
 
         closing_transaction_descriptions = ('SELL TRADE', 'CLOSE SHORT POSITION')
 
         transaction['opening transaction'] = description in opening_transaction_descriptions
+        if 'instrument' in transaction['transactionItem']:
+            if transaction['transactionItem']['instrument']['symbol'] == 'FB':
+                transaction['transactionItem']['instrument']['symbol'] = 'META'
 
 
 #### Historical Transaction
@@ -756,42 +799,106 @@ def create_dataframe(processed_transactions):
     return transaction_dataframe
 
 
-def cumulative_results(transactions_df):
-    '''
-    Calculates daily, weekly, monthly, and annual cumulative gains.
+# =============================================================================
+# def cumulative_results(transactions_df):
+#     '''
+#     Calculates daily, weekly, monthly, and annual cumulative gains.
+# 
+#     Parameters:
+#         transactions_df (pd.DataFrame): Transaction DataFrame.
+# 
+#     Returns:
+#         pd.DataFrame: DataFrame with columns of cumulative gains.
+#     '''
+# 
+#     transactions_df['Date'] = pd.to_datetime(transactions_df['Date'])
+# 
+#     methods = ['FIFO', 'LIFO']
+#     frequencies = ['daily', 'weekly', 'monthly', 'annual']
+#     #filtered_df = transactions_df[(transactions_df['FIFO'] != 0) & (transactions_df['Type'] == 'TRADE')]
+#     for freq in frequencies:
+#         #column_name_count = f'{freq.capitalize()} Count'
+#         #transactions_df[column_name_count] = ((filtered_df['Type'] == 'TRADE').groupby
+#         #                                    (filtered_df['Date'].dt.to_period(freq[0])).cumsum())
+# 
+# 
+#         for method in methods:
+# 
+#             #column_name_profit = f'{method} {freq.capitalize()}'
+#             column_name_profit_result = f'{method} {freq.capitalize()} - Result'
+#             #transactions_df[column_name_profit] = (filtered_df.groupby
+#             #                                       (filtered_df['Date'].dt.to_period(freq[0]))[method].cumsum())
+#             transactions_df[column_name_profit_result] = calculate_cumulative_result(transactions_df, freq[0], method)
+# 
+#     transactions_df['Date'] = transactions_df['Date'].dt.date
+# 
+#     return transactions_df
+# 
+# 
+# def calculate_cumulative_result(dataframe, freq, method):
+#     '''
+#     Calculates cumulative gains for a given method and frequency.
+# 
+#     Parameters:
+#         dataframe (pd.DataFrame): Transaction DataFrame.
+#         freq (str): Frequency ('d' for daily, 'w' for weekly, 'm' for monthly, 'a' for annual).
+#         method (str): Accounting method ('FIFO' or 'LIFO').
+# 
+#     Returns:
+#         pd.Series: Cumulative gains.
+#     '''
+# 
+#     daily_cumulative_columns = {
+#         'd': method,
+#         'w': f'{method} Daily - Result',
+#         'm': f'{method} Daily - Result',
+#         'a': f'{method} Monthly - Result',
+#     }
+# 
+#     column = daily_cumulative_columns[freq]
+# 
+#     cumulative_column = dataframe.groupby(dataframe['Date'].dt.to_period(freq))[column].cumsum()
+# 
+#     # Marcar las filas duplicadas
+#     #duplicated_rows = dataframe.duplicated(subset=['Date', 'Time'], keep='last')
+# 
+#     # Asignar 0.0 a las filas duplicadas
+#     #cumulative_column[duplicated_rows] = 0.0
+# 
+#     return cumulative_column.where(dataframe.groupby(dataframe['Date'].dt.to_period(freq))
+#                                    ['DateTime'].transform('max') == dataframe['DateTime'],
+#                                    0.0)
+# 
+# 
+# def calculate_cumulative_count_result(dataframe):
+#     '''
+#     Calculates cumulative gains for a given method and frequency.
+# 
+#     Parameters:
+#         dataframe (pd.DataFrame): Transaction DataFrame.
+#         freq (str): Frequency ('d' for daily, 'w' for weekly, 'm' for monthly, 'a' for annual).
+#         method (str): Accounting method ('FIFO' or 'LIFO').
+# 
+#     Returns:
+#         pd.Series: Cumulative gains.
+#     '''
+# 
+#     dataframe['Date'] = pd.to_datetime(dataframe['Date'])
+#     filtered_df = dataframe[(dataframe['FIFO'] != 0) & (dataframe['Type'] == 'TRADE')]
+# 
+#     for freq in ['d', 'w', 'm', 'a']:
+#         cumulative_count = filtered_df.groupby(filtered_df['Date'].dt.to_period(freq))['FIFO'].count()
+# 
+#         for dte, valor in cumulative_count.items():
+#             ultima_fila = dataframe.loc[dataframe['Date'].dt.to_period(freq) == dte].index[-1]
+#             dataframe.loc[ultima_fila, f'{freq.capitalize()} Count - Result'] = valor
+# 
+#     dataframe['Date'] = dataframe['Date'].dt.date
+#     return dataframe
+# =============================================================================
 
-    Parameters:
-        transactions_df (pd.DataFrame): Transaction DataFrame.
 
-    Returns:
-        pd.DataFrame: DataFrame with columns of cumulative gains.
-    '''
-
-    transactions_df['Date'] = pd.to_datetime(transactions_df['Date'])
-
-    methods = ['FIFO', 'LIFO']
-    frequencies = ['daily', 'weekly', 'monthly', 'annual']
-    filtered_df = transactions_df[(transactions_df['FIFO'] != 0) & (transactions_df['Type'] == 'TRADE')]
-    for freq in frequencies:
-        column_name_count = f'{freq.capitalize()} Count'
-        transactions_df[column_name_count] = ((filtered_df['Type'] == 'TRADE').groupby
-                                            (filtered_df['Date'].dt.to_period(freq[0])).cumsum())
-
-
-        for method in methods:
-
-            column_name_profit = f'{method} {freq.capitalize()}'
-            #column_name_profit_result = f'{method} {freq.capitalize()} - Result'
-            transactions_df[column_name_profit] = (filtered_df.groupby
-                                                   (filtered_df['Date'].dt.to_period(freq[0]))[method].cumsum())
-            #transactions_df[column_name_profit_result] = calculate_cumulative_result(transactions_df, freq[0], method)
-
-    transactions_df['Date'] = transactions_df['Date'].dt.date
-
-    return transactions_df
-
-
-def calculate_cumulative_result(dataframe, freq, method):
+def calculate_cumulative(dataframe, freq, method):
     '''
     Calculates cumulative gains for a given method and frequency.
 
@@ -806,9 +913,9 @@ def calculate_cumulative_result(dataframe, freq, method):
 
     daily_cumulative_columns = {
         'd': method,
-        'w': f'{method} Daily - Result',
-        'm': f'{method} Daily - Result',
-        'a': f'{method} Monthly - Result',
+        'w': f'{method} Daily',
+        'm': f'{method} Daily',
+        'a': f'{method} Monthly',
     }
 
     column = daily_cumulative_columns[freq]
@@ -816,41 +923,45 @@ def calculate_cumulative_result(dataframe, freq, method):
     cumulative_column = dataframe.groupby(dataframe['Date'].dt.to_period(freq))[column].cumsum()
 
     # Marcar las filas duplicadas
-    #duplicated_rows = dataframe.duplicated(subset=['Date', 'Time'], keep='last')
+    duplicated_rows = dataframe.duplicated(subset=['Date', 'Time'], keep='last')
 
     # Asignar 0.0 a las filas duplicadas
-    #cumulative_column[duplicated_rows] = 0.0
+    cumulative_column[duplicated_rows] = 0.0
 
     return cumulative_column.where(dataframe.groupby(dataframe['Date'].dt.to_period(freq))
                                    ['DateTime'].transform('max') == dataframe['DateTime'],
                                    0.0)
 
 
-def calculate_cumulative_count_result(dataframe):
+def cumulative_results(transactions_df):
     '''
-    Calculates cumulative gains for a given method and frequency.
+    Calculates daily, weekly, monthly, and annual cumulative gains.
 
     Parameters:
-        dataframe (pd.DataFrame): Transaction DataFrame.
-        freq (str): Frequency ('d' for daily, 'w' for weekly, 'm' for monthly, 'a' for annual).
-        method (str): Accounting method ('FIFO' or 'LIFO').
+        transactions_df (pd.DataFrame): Transaction DataFrame.
 
     Returns:
-        pd.Series: Cumulative gains.
+        pd.DataFrame: DataFrame with columns of cumulative gains.
     '''
 
-    dataframe['Date'] = pd.to_datetime(dataframe['Date'])
-    filtered_df = dataframe[(dataframe['FIFO'] != 0) & (dataframe['Type'] == 'TRADE')]
+    transactions_df['DateTime'] = pd.to_datetime(transactions_df['Date'].astype(str) +
+                                                 transactions_df['Time'].astype(str),
+                                                 format='%Y-%m-%d%H:%M:%S')
+    transactions_df['Date'] = pd.to_datetime(transactions_df['Date'])
 
-    for freq in ['d', 'w', 'm', 'a']:
-        cumulative_count = filtered_df.groupby(filtered_df['Date'].dt.to_period(freq))['FIFO'].count()
+    methods = ['FIFO', 'LIFO']
+    frequencies = ['daily', 'weekly', 'monthly', 'annual']
 
-        for dte, valor in cumulative_count.items():
-            ultima_fila = dataframe.loc[dataframe['Date'].dt.to_period(freq) == dte].index[-1]
-            dataframe.loc[ultima_fila, f'{freq.capitalize()} Count - Result'] = valor
+    for freq in frequencies:
+        for method in methods:
 
-    dataframe['Date'] = dataframe['Date'].dt.date
-    return dataframe
+            column_name = f'{method} {freq.capitalize()}'
+            transactions_df[column_name] = calculate_cumulative(transactions_df, freq[0], method)
+
+    transactions_df = transactions_df.drop('DateTime', axis=1)
+    transactions_df['Date'] = transactions_df['Date'].dt.date
+
+    return transactions_df
 
 
 def convert_to_excel(transactions_data, excel_path):

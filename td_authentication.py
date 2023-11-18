@@ -26,13 +26,12 @@ Created on Sun Oct 13 13:09:41 2019
 @author: LC
 """
 
-from datetime import datetime, timedelta
-import time
-import urllib.parse as up
 import os
 import pickle
 import requests
-from selenium import webdriver
+import webbrowser
+import urllib.parse as up
+from datetime import datetime, timedelta
 
 
 class TDAuthentication():
@@ -152,33 +151,16 @@ class TDAuthentication():
         auth_url = str('https://auth.tdameritrade.com/auth?response_type=code&redirect_uri='
                + up.quote(self._td_config['redirect_uri']) + '&client_id=' + up.quote(client_code))
 
-        # In order to auto-authenticate is necessary to have chromedriver.
-        options = webdriver.ChromeOptions()
 
-        #If Chromedriver is available
-        if os.path.isfile('chromedriver.exe'):
+        # aks the user to go to the URL provided, they will be prompted to authenticate themselves.
+        print('Please login to your account.')
+        webbrowser.open("{}".format(auth_url))
 
-            driver = webdriver.Chrome('chromedriver', chrome_options=options)
-            # go to the URL
-            driver.get(auth_url)
-            #wait till get the code that is the url of the forwarded page.
-            while True:
-                try:
-                    #grab the part we need, and decode it.
-                    access_code = up.unquote(driver.current_url.split('code=')[1])
-                    if access_code != '':
-                        break
-                    time.sleep(2)
-                except (TypeError, IndexError) as error:
-                    print(f"Error while getting access code: {error}")
-
-            #close the browser
-            driver.close()
-
-            return access_code
-
-        print('Please download chromedriver')
-        return None
+        # ask the user to take the final URL after authentication and paste here so we can parse.
+        current_url = input('Paste the redirected full URL here: ')
+        access_code = up.unquote(current_url.split('code=')[1])
+     
+        return access_code
 
 
     def _get_access_token(self, max_retries=3):
@@ -194,34 +176,31 @@ class TDAuthentication():
 
         access_type = 'offline' if not self._is_single_access else None
 
-        for _ in range(max_retries):
-            access_code = self._get_access_code()
+        access_code = self._get_access_code()
 
-            # define the payload
-            payload = {'grant_type': 'authorization_code',
-                       'access_type': access_type,
-                       'code': access_code,
-                       'client_id':self._td_config["client_id"],
-                       'redirect_uri':self._td_config["redirect_uri"]}
+        # define the payload
+        payload = {'grant_type': 'authorization_code',
+                   'access_type': access_type,
+                   'code': access_code,
+                   'client_id':self._td_config["client_id"],
+                   'redirect_uri':self._td_config["redirect_uri"]}
 
-            auth_reply = requests.post(url = url, headers = headers, data = payload, timeout=5)
+        auth_reply = requests.post(url = url, headers = headers, data = payload, timeout=5)
 
-            if auth_reply.status_code == 200:
-                # convert it to dictionary
-                token_response = auth_reply.json()
+        if auth_reply.status_code == 200:
+            # convert it to dictionary
+            token_response = auth_reply.json()
 
-                if not self._is_single_access:
-                    self._update_refresh_token(token_response)
+            if not self._is_single_access:
+                self._update_refresh_token(token_response)
 
-                # grab the access_token
-                self._update_access_token(token_response)
-                return
+            # grab the access_token
+            self._update_access_token(token_response)
+            return
 
-            print(auth_reply.status_code)
-            self.logged_in_state = False
-            print('Could not authenticate while getting access token!')
-
-        print('Maximum retries reached. Unable to authenticate.')
+        print(auth_reply.status_code)
+        self.logged_in_state = False
+        print('Could not authenticate while getting access token!')
 
 
     def _update_refresh_token(self, token_response):
